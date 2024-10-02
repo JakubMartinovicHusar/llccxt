@@ -230,11 +230,11 @@ public partial class Exchange
             else
             {
                 contentType = contentType == "" ? "application/json" : contentType;
-#if NET7_0_OR_GREATER
-            var contentTypeHeader = new MediaTypeWithQualityHeaderValue(contentType);
-#else
+// #if NET7_0_OR_GREATER
+//                 var contentTypeHeader = new MediaTypeWithQualityHeaderValue(contentType);
+// #else
                 var contentTypeHeader = contentType;
-#endif
+// #endif
 
                 var stringContent = body != null ? new StringContent(body, Encoding.UTF8, contentTypeHeader) : null;
                 if (stringContent != null)

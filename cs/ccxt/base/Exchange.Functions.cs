@@ -1,3 +1,4 @@
+using SpanJsonSerializer = SpanJson.JsonSerializer;
 using Newtonsoft.Json;
 
 using System.Text.RegularExpressions;
@@ -256,10 +257,12 @@ public partial class Exchange
         if (obj is Exception ex)
         {
             var errorObj = new { name = ex.GetType().Name };
-            return JsonConvert.SerializeObject(errorObj);
+            //return JsonConvert.SerializeObject(errorObj);
+            return SpanJsonSerializer.Generic.Utf16.Serialize(errorObj);
         }
 
-        return JsonConvert.SerializeObject(obj);
+        return SpanJsonSerializer.Generic.Utf16.Serialize(obj);
+        //return JsonConvert.SerializeObject(obj);
         // if (obj.GetType() == typeof(dict))
         // {
         //     var obj2 = (dict)obj;
