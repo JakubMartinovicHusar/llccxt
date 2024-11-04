@@ -14100,5 +14100,7 @@ public partial class binance : Exchange
             { "price", null },
             { "fee", null },
         };
+
+
     }
 }

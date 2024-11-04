@@ -1066,7 +1066,7 @@ public partial class hyperliquid : ccxt.hyperliquid
             { "trades", this.handleTrades },
             { "l2Book", this.handleOrderBook },
             { "candle", this.handleOHLCV },
-            { "orderUpdates", this.handleOrder },
+            // { "orderUpdates", this.handleOrder },
             { "userFills", this.handleMyTrades },
             { "webData2", this.handleWsTickers },
             { "post", this.handleWsPost },

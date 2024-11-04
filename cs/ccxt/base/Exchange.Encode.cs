@@ -1,4 +1,6 @@
+
 namespace ccxt;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -110,11 +112,19 @@ public partial class Exchange
 
     public static string binaryToHex(byte[] buff)
     {
-        var result = string.Empty;
-        foreach (var t in buff)
-            result += t.ToString("X2");
-        // return result;
-        return result.ToLower();// check this
+        var convStr = "X2";
+        var result = new StringBuilder(buff.Length * 2);
+        foreach (var t in buff.AsSpan())
+           result.Append(t.ToString(convStr));
+        //return result;
+        return result.ToString().ToLower();// check this
+
+        // var result = string.Empty;
+        // foreach (var t in buff)
+        //    result += t.ToString("X2");
+        // //return result;
+        // return result.ToLower();// check this
+        //return string.Concat(buff.Select(b => b.ToString("X2"))).ToLower();
     }
 
     public string binaryToBase16(object buff2)

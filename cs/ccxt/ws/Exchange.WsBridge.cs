@@ -129,8 +129,9 @@ public partial class Exchange
     {
         var url = url2.ToString();
         var result = this.checkWsProxySettings() as List<object>;
-        var proxy = this.getWsProxy(result);
-        return this.clients.GetOrAdd(url, (url) =>
+        var proxy = this.getWsProxy(result);  
+        
+        var clientResult = this.clients.GetOrAdd(url, (url) =>
         {
             object ws = this.safeValue(this.options, "ws", new Dictionary<string, object>() { });
             var wsOptions = this.safeValue(ws, "options", new Dictionary<string, object>() { });
@@ -150,6 +151,13 @@ public partial class Exchange
             }
             return client;
         });
+        
+        // // TODO: implement | Byte array messaging should be handled similarily 
+        // if(!this.isJsonSubscribed){
+        //     clientResult.jsonStringMessageReceived += this.ProcessJsonMessage;
+        //     isJsonSubscribed = true;  
+        // }
+        return clientResult;
     }
 
     public async Task<object> watch(object url2, object messageHash2, object message = null, object subscribeHash2 = null, object subscription = null)

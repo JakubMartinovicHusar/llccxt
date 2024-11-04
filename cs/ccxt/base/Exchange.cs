@@ -14,6 +14,8 @@ using dict = Dictionary<string, object>;
 
 public partial class Exchange
 {
+    static Object nonceLock = new Object();
+    static long lastMillisecondNonce = 0;
 
     public Exchange(object userConfig2 = null)
     {
@@ -37,6 +39,20 @@ public partial class Exchange
         {
             this.setSandboxMode(isSandbox);
         }
+    }
+
+    protected long GetNewMillisecondNonce(){
+        long returnNonce;
+        lock(Exchange.nonceLock){
+            var newNonce = this.milliseconds();
+            if(Exchange.lastMillisecondNonce >= newNonce)
+                Exchange.lastMillisecondNonce = lastMillisecondNonce + 1;
+            else
+                Exchange.lastMillisecondNonce = newNonce;
+            returnNonce = Exchange.lastMillisecondNonce;
+        }
+        //Console.WriteLine($"returnNonce: {returnNonce}");
+        return returnNonce;
     }
 
     private void initHttpClient()

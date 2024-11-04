@@ -1255,7 +1255,7 @@ public partial class hyperliquid : Exchange
             }
         }
         parameters = this.omit(parameters, new List<object>() {"slippage", "clientOrderId", "client_id", "slippage", "triggerPrice", "stopPrice", "stopLossPrice", "takeProfitPrice", "timeInForce"});
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         object orderReq = new List<object>() {};
         for (object i = 0; isLessThan(i, getArrayLength(orders)); postFixIncrement(ref i))
         {
@@ -1406,7 +1406,7 @@ public partial class hyperliquid : Exchange
         object market = this.market(symbol);
         object clientOrderId = this.safeValue2(parameters, "clientOrderId", "client_id");
         parameters = this.omit(parameters, new List<object>() {"clientOrderId", "client_id"});
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         object request = new Dictionary<string, object>() {
             { "nonce", nonce },
         };
@@ -1496,7 +1496,7 @@ public partial class hyperliquid : Exchange
         parameters ??= new Dictionary<string, object>();
         this.checkRequiredCredentials();
         await this.loadMarkets();
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         object request = new Dictionary<string, object>() {
             { "nonce", nonce },
         };
@@ -1575,7 +1575,7 @@ public partial class hyperliquid : Exchange
         this.checkRequiredCredentials();
         await this.loadMarkets();
         parameters = this.omit(parameters, new List<object>() {"clientOrderId", "client_id"});
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         object request = new Dictionary<string, object>() {
             { "nonce", nonce },
         };
@@ -1668,7 +1668,7 @@ public partial class hyperliquid : Exchange
         {
             triggerPrice = "0";
         }
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         object orderReq = new Dictionary<string, object>() {
             { "a", this.parseToInt(getValue(market, "baseId")) },
             { "b", isBuy },
@@ -2528,7 +2528,7 @@ public partial class hyperliquid : Exchange
         }
         object asset = this.parseToInt(getValue(market, "baseId"));
         object isCross = (isEqual(marginMode, "cross"));
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         parameters = this.omit(parameters, new List<object>() {"leverage"});
         object updateAction = new Dictionary<string, object>() {
             { "type", "updateLeverage" },
@@ -2589,7 +2589,7 @@ public partial class hyperliquid : Exchange
         object marginMode = this.safeString(parameters, "marginMode", "cross");
         object isCross = (isEqual(marginMode, "cross"));
         object asset = this.parseToInt(getValue(market, "baseId"));
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         parameters = this.omit(parameters, "marginMode");
         object updateAction = new Dictionary<string, object>() {
             { "type", "updateLeverage" },
@@ -2664,7 +2664,7 @@ public partial class hyperliquid : Exchange
         {
             sz = prefixUnaryNeg(ref sz);
         }
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         object updateAction = new Dictionary<string, object>() {
             { "type", "updateIsolatedMargin" },
             { "asset", asset },
@@ -2737,7 +2737,7 @@ public partial class hyperliquid : Exchange
         this.checkRequiredCredentials();
         await this.loadMarkets();
         object isSandboxMode = this.safeBool(this.options, "sandboxMode");
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         if (isTrue(this.inArray(fromAccount, new List<object>() {"spot", "swap", "perp"})))
         {
             // handle swap <> spot account transfer
@@ -2831,7 +2831,7 @@ public partial class hyperliquid : Exchange
         }
         object vaultAddress = this.formatVaultAddress(this.safeString(parameters, "vaultAddress"));
         parameters = this.omit(parameters, "vaultAddress");
-        object nonce = this.milliseconds();
+        object nonce = this.GetNewMillisecondNonce();
         object action = new Dictionary<string, object>() {};
         object sig = null;
         if (isTrue(!isEqual(vaultAddress, null)))

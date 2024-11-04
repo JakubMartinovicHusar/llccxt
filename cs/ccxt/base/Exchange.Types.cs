@@ -299,7 +299,7 @@ public struct Order
     public Dictionary<string, object>? info;
     public Order(object order2)
     {
-        var order = (Dictionary<string, object>)order2;
+        var order = ((Dictionary<string, object>)order2).Select(x => new KeyValuePair<string, object>(x.Key, x.Value)).ToDictionary(x => x.Key, x => x.Value);
         id = Exchange.SafeString(order, "id");
         clientOrderId = Exchange.SafeString(order, "clientOrderId");
         timestamp = Exchange.SafeInteger(order, "timestamp");

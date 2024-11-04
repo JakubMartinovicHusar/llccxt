@@ -1,7 +1,5 @@
 using System.Text;
 
-namespace ccxt;
-
 using System;
 using System.Net.WebSockets;
 using System.Collections.Concurrent;
@@ -9,23 +7,33 @@ using System.IO.Compression;
 using System.Net;
 using System.Runtime.CompilerServices;
 
+namespace ccxt;
+
+
+public delegate void HandleJsonStringMessageDelegate(object sender, JsonMessageEventArgs eventArgs);
+public delegate void HandleByteArrayMessageDelegate(object sender, ByteArrayMessageEventArgs eventArgs);
 
 public partial class Exchange
 {
     public partial class WebSocketClient
     {
-        public delegate void handleJsonStringMessageDelegate(WebSocketClient client, string messageJsonString);
-        public delegate void handleByteArrayMessageDelegate(WebSocketClient client, byte[] messageBytes);
-
-        public event handleJsonStringMessageDelegate jsonStringMessageReceived;
-        public event handleByteArrayMessageDelegate byteArrayMessageReceived;
-
+        // public delegate void ThresholdReachedEventHandler(ThresholdReachedEventArgs e);
+        public event HandleJsonStringMessageDelegate jsonStringMessageReceived;
+        public event HandleByteArrayMessageDelegate byteArrayMessageReceived;
 
         private void TryHandleMessage (string message)
         {
-            if (this.jsonStringMessageReceived != null)
-                this.jsonStringMessageReceived(this, message);
-
+            // Console.WriteLine($"TryHandleMessage: {message}");
+            try{
+                this.jsonStringMessageReceived?.Invoke(this, new JsonMessageEventArgs(message));
+            }
+            catch (Exception e)
+            {
+                 if (this.verbose)
+                 {
+                    Console.WriteLine($"Error in TryHandleMessage Json: {e.Message}");
+                 }
+            }
             if (this.handleMessage != null){
                 object deserializedMessages = message;
                 try
@@ -39,13 +47,15 @@ public partial class Exchange
             }
         }
 
-        private void TryByteArrayMessage (byte[] messageByteArray)
+        private async Task handleMessageAsync(WebSocketClient client, object messageContent)
         {
-            if (this.byteArrayMessageReceived != null)
-                this.byteArrayMessageReceived(this, messageByteArray);
+            this.handleMessage(this, messageContent);
         }
 
-        
+        private void TryByteArrayMessage (byte[] messageByteArray)
+        {
+            this.byteArrayMessageReceived?.Invoke(this, new ByteArrayMessageEventArgs(messageByteArray));
+        }
     
         private async Task Receiving(ClientWebSocket webSocket)
         {
@@ -68,7 +78,7 @@ public partial class Exchange
                     if (result.MessageType == WebSocketMessageType.Text)
                     {
                         // var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        TryByteArrayMessage(memory.ToArray());
+                        // TryByteArrayMessage(memory.ToArray());
                         var message = Encoding.UTF8.GetString(memory.ToArray(), 0, (int)memory.Length);
                         if (this.verbose)
                         {
@@ -88,7 +98,7 @@ public partial class Exchange
                         {
                             decompressionStream.CopyTo(decompressedStream);
                             byte[] decompressedData = decompressedStream.ToArray();
-                            TryByteArrayMessage(decompressedData);
+                            // TryByteArrayMessage(decompressedData);
                             string decompressedString = System.Text.Encoding.UTF8.GetString(decompressedData);
 
                             if (this.verbose)
@@ -131,16 +141,6 @@ public partial class Exchange
                                 WebSocketMessageType.Text,
                                 true,
                                 CancellationToken.None);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void sendPreparedMessageSync(byte[] messageBytes)
-        {
-            var arraySegment = new ArraySegment<byte>(messageBytes, 0, messageBytes.Length);
-            sendAsyncWrapper(this.webSocket, arraySegment,
-                             WebSocketMessageType.Text,
-                             true,
-                             CancellationToken.None).Wait();
         }
 
     }

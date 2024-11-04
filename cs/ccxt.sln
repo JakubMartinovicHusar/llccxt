@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "tests", "tests\tests.csproj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cli", "cli\cli.csproj", "{D04F0D67-4A3A-4B5F-80C2-45555F83610C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HkdfStandard", "..\..\HKDF.Standard\src\HkdfStandard\HkdfStandard.csproj", "{5AD6C233-3620-413A-876F-FBAF41BBE31D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{D04F0D67-4A3A-4B5F-80C2-45555F83610C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D04F0D67-4A3A-4B5F-80C2-45555F83610C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D04F0D67-4A3A-4B5F-80C2-45555F83610C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5AD6C233-3620-413A-876F-FBAF41BBE31D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5AD6C233-3620-413A-876F-FBAF41BBE31D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5AD6C233-3620-413A-876F-FBAF41BBE31D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5AD6C233-3620-413A-876F-FBAF41BBE31D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

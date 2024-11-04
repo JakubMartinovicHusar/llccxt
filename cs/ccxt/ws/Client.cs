@@ -226,7 +226,7 @@ public partial class Exchange
                         {
                             // if (this.verbose)
                             // {
-                            //     Console.WriteLine("Sending ping: " + pingResult);
+                                // Console.WriteLine($"Sending ping: ({this.url}) -> " + pingResult);
                             // }
                             if (pingResult is string)
                             {

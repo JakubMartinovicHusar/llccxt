@@ -1,6 +1,8 @@
 using System;
 using System.Text;
 using SpanJson;
+using HkdfStandard;
+using System.Security.Cryptography;
 using JsonConvert = Newtonsoft.Json.JsonConvert;
 
 namespace ccxt.pro;
@@ -9,24 +11,30 @@ namespace ccxt.pro;
 // https://github.com/ccxt/ccxt/blob/master/CONTRIBUTING.md#how-to-contribute-code
 
 public partial class binance : ccxt.binance
-{
-    public virtual PreparedMessage CreateOrderPrepareMessageWs(object parameters = null)
-    {
-        PreparedMessage preparedMessage;
+{ 
+    private Placeholder<string> requestIdPlaceHolder = new Placeholder<string>("%REQUEST_ID_PLACE_HOLDER%", "%REQUEST_ID_PLACE_HOLDER%");
+    private Placeholder<string> messageHashPlaceHolder = new Placeholder<string>("%MESSAGE_HASH_PLACE_HOLDER%", "%MESSAGE_HASH_PLACE_HOLDER%");
+    private Placeholder<string> orderIdPlaceHolder = new Placeholder<string>("999999", "999999");
+    private Placeholder<string> symbolPlaceHolder =  new Placeholder<string>("BTC/USDC:USDC", "BTCUSDC");
+    private Placeholder<string> typePlaceHolder = new Placeholder<string>("limit", "LIMIT"); 
+    private Placeholder<string> sidePlaceHolder = new Placeholder<string>("buy", "BUY"); 
+    private Placeholder<double> amountPlaceHolder = new Placeholder<double>(0.1, "0.1"); 
+    private Placeholder<double> pricePlaceHolder = new Placeholder<double>(0.9, "0.9");
 
-        object requestIdPlaceHolder = "%REQUEST_ID_PLACE_HOLDER%";
-        object messageHashPlaceHolder = "%MESSAGE_HASH_PLACE_HOLDER%";
-        object symbolPlaceHolder = "%SYMBOL_PLACE_HOLDER%";
-        object typePlaceHolder = "%TYPE_PLACE_HOLDER%"; 
-        object sidePlaceHolder = "%SIDE_PLACE_HOLDER%"; 
-        object amountPlaceHolder = "%AMOUNT_PLACE_HOLDER%"; 
-        object pricePlaceHolder = "%PRICE_PLACE_HOLDER%"; 
+    public virtual PreparedCreateOrderMessage CreateOrderPrepareMessageWs(Dictionary<string, object> prepareParameters = null)
+    {
+        object parameters = null;
+        if (parameters == null)
+            parameters = (object)new Dictionary<string, object>();
+        else
+            parameters = (object)prepareParameters.ToDictionary(entry => entry.Key, entry => entry.Value); // clone
         
+        PreparedCreateOrderMessage preparedMessage; 
 
         #region CREATE ORDER ****************************** this part of code is from createOrder method ****************************** //
         parameters ??= new Dictionary<string, object>();
         this.loadMarkets().Wait();
-        object market = this.market(symbolPlaceHolder);
+        object market = this.market(symbolPlaceHolder.PassedValue);
         object marketType = this.getMarketType("createOrderWs", market, parameters);
         if (isTrue(isTrue(!isEqual(marketType, "spot")) && isTrue(!isEqual(marketType, "future"))))
         {
@@ -35,7 +43,7 @@ public partial class binance : ccxt.binance
         object url = getValue(getValue(getValue(getValue(this.urls, "api"), "ws"), "ws-api"), marketType);
         object sor = this.safeBool2(parameters, "sor", "SOR", false);
         parameters = this.omit(parameters, "sor", "SOR");
-        object payload = this.createOrderRequest(symbolPlaceHolder, typePlaceHolder, sidePlaceHolder, amountPlaceHolder, pricePlaceHolder, parameters);
+        object payload = this.createOrderRequest(symbolPlaceHolder.PassedValue, typePlaceHolder.PassedValue, sidePlaceHolder.PassedValue, amountPlaceHolder.PassedValue, pricePlaceHolder.PassedValue, parameters);
         object returnRateLimits = false;
         var returnRateLimitsparametersVariable = this.handleOptionAndParams(parameters, "createOrderWs", "returnRateLimits", false);
         returnRateLimits = ((IList<object>)returnRateLimitsparametersVariable)[0];
@@ -44,7 +52,7 @@ public partial class binance : ccxt.binance
         object test = this.safeBool(parameters, "test", false);
         parameters = this.omit(parameters, "test");
         object message = new Dictionary<string, object>() {
-            { "id", messageHashPlaceHolder },
+            { "id", messageHashPlaceHolder.PassedValue },
             { "method", "order.place" },
             { "params", this.signParams(this.extend(payload, parameters)) },
         };
@@ -62,25 +70,340 @@ public partial class binance : ccxt.binance
             { "method", this.handleOrderWs },
         };
         #endregion
+        var queryTemplate = this.SignParamsTemplateQuery(this.extend(payload, parameters));
+        var parametersPlaceHolder = GetParametersPlaceholder(parameters);
 
-        preparedMessage = new PreparedMessage(
+        preparedMessage = new PreparedCreateOrderMessage(
             client: this.client(url),
             exchange: this,
             url: (string)url,
-            bytesMessage: Encoding.UTF8.GetBytes( JsonSerializer.Generic.Utf16.Serialize(message)),
-            placeholderObjectDict: new Dictionary<string, object>() {
-                { "messageHash", messageHashPlaceHolder },
-                { "symbol", symbolPlaceHolder },
-                { "type", typePlaceHolder },
-                { "side", sidePlaceHolder },
-                { "amount", amountPlaceHolder },
-                { "price", pricePlaceHolder },
-                { "parameters", parameters },
+            bytesMessage: Encoding.UTF8.GetBytes(JsonSerializer.Generic.Utf16.Serialize(message)),
+            placeholderObjectDict: new Dictionary<string, IPlaceholder>() {
+                { "messageHash", (IPlaceholder)messageHashPlaceHolder },
+                { "symbol", (IPlaceholder)symbolPlaceHolder },
+                { "type", (IPlaceholder)typePlaceHolder },
+                { "side", (IPlaceholder)sidePlaceHolder },
+                { "amount", (IPlaceholder)amountPlaceHolder },
+                { "price", (IPlaceholder)pricePlaceHolder },
+                { "parameters", (IPlaceholder)parametersPlaceHolder },
             },
-            subscription: subscription
+            subscription: subscription,
+            queryTemplate: queryTemplate
         );
-
+        
         return preparedMessage;
         // await this.watch(url, messageHash, message, messageHash, subscription);
     }
+
+
+    public override PreparedCancelOrderMessage CancelOrderPrepareMessageWs(Dictionary<string, object> prepareParameters = null)
+    {
+        object parameters = null;
+        if (parameters == null)
+            parameters = (object)new Dictionary<string, object>();
+        else
+            parameters = (object)prepareParameters.ToDictionary(entry => entry.Key, entry => entry.Value); // clone
+
+        PreparedCancelOrderMessage preparedMessage = null;
+        
+        #region CANCEL ORDER ****************************** this part of code is from createOrder method ****************************** //
+        parameters ??= new Dictionary<string, object>();
+        this.loadMarkets().Wait();
+        if (isTrue(isEqual(symbol, null)))
+        {
+            throw new BadRequest ((string)add(this.id, " cancelOrderWs requires a symbol")) ;
+        }
+        object market = this.market(symbolPlaceHolder.PassedValue);
+        object type = this.getMarketType("cancelOrderWs", market, parameters);
+        object url = getValue(getValue(getValue(getValue(this.urls, "api"), "ws"), "ws-api"), type);
+        object requestId = this.requestId(url);
+        object messageHash = ((object)requestId).ToString();
+        object returnRateLimits = false;
+        var returnRateLimitsparametersVariable = this.handleOptionAndParams(parameters, "cancelOrderWs", "returnRateLimits", false);
+        returnRateLimits = ((IList<object>)returnRateLimitsparametersVariable)[0];
+        parameters = ((IList<object>)returnRateLimitsparametersVariable)[1];
+        object payload = new Dictionary<string, object>() {
+            { "symbol", this.marketId(symbolPlaceHolder.PassedValue) },
+            { "returnRateLimits", returnRateLimits },
+        };
+        object clientOrderId = this.safeString2(parameters, "origClientOrderId", "clientOrderId");
+        if (isTrue(!isEqual(clientOrderId, null)))
+        {
+            ((IDictionary<string,object>)payload)["origClientOrderId"] = clientOrderId;
+        } else
+        {
+            ((IDictionary<string,object>)payload)["orderId"] = this.parseToInt(orderIdPlaceHolder.PassedValue);
+        }
+        parameters = this.omit(parameters, new List<object>() {"origClientOrderId", "clientOrderId"});
+        object message = new Dictionary<string, object>() {
+            { "id", messageHash },
+            { "method", "order.cancel" },
+            { "params", this.signParams(this.extend(payload, parameters)) },
+        };
+        Dictionary<string, object> subscription = new Dictionary<string, object>() {
+            { "method", this.handleOrderWs },
+        };
+        #endregion
+        var queryTemplate = this.SignParamsTemplateQuery(this.extend(payload, parameters));
+        var parametersPlaceHolder = GetParametersPlaceholder(parameters);
+
+        preparedMessage = new PreparedCancelOrderMessage(
+            client: this.client(url),
+            exchange: this,
+            url: (string)url,
+            bytesMessage: Encoding.UTF8.GetBytes(JsonSerializer.Generic.Utf16.Serialize(message)),
+            placeholderObjectDict: new Dictionary<string, IPlaceholder>() {
+                { "messageHash", (IPlaceholder)messageHashPlaceHolder },
+                { "id", (IPlaceholder)orderIdPlaceHolder },
+                { "parameters", (IPlaceholder)parametersPlaceHolder },
+            },
+            subscription: subscription,
+            queryTemplate: queryTemplate
+        );
+
+        return preparedMessage;
+
+    }
+
+    public override PreparedEditOrderMessage EditOrderPrepareMessageWs(Dictionary<string, object> prepareParameters = null)
+    {
+        object parameters = null;
+        if (parameters == null)
+            parameters = (object)new Dictionary<string, object>();
+        else
+            parameters = (object)prepareParameters.ToDictionary(entry => entry.Key, entry => entry.Value); // clone
+
+        PreparedEditOrderMessage preparedMessage = null;
+
+        #region EDIT ORDER ****************************** this part of code is from createOrder method ****************************** //
+
+        parameters ??= new Dictionary<string, object>();
+        this.loadMarkets().Wait();
+        object market = this.market(symbolPlaceHolder.PassedValue);
+        object marketType = this.getMarketType("editOrderWs", market, parameters);
+        if (isTrue(isTrue(!isEqual(marketType, "spot")) && isTrue(!isEqual(marketType, "future"))))
+        {
+            throw new BadRequest ((string)add(this.id, " editOrderWs only supports spot or swap markets")) ;
+        }
+        object url = getValue(getValue(getValue(getValue(this.urls, "api"), "ws"), "ws-api"), marketType);
+        object requestId = this.requestId(url);
+        object messageHash = ((object)requestId).ToString();
+        object payload = null;
+        if (isTrue(isEqual(marketType, "spot")))
+        {
+            payload = this.editSpotOrderRequest(
+                orderIdPlaceHolder.PassedValue, symbolPlaceHolder.PassedValue, typePlaceHolder.PassedValue, sidePlaceHolder.PassedValue, amountPlaceHolder.PassedValue, pricePlaceHolder.PassedValue, parameters);
+        } else if (isTrue(isEqual(marketType, "future")))
+        {
+            payload = this.editContractOrderRequest(orderIdPlaceHolder.PassedValue, symbolPlaceHolder.PassedValue, typePlaceHolder.PassedValue, sidePlaceHolder.PassedValue, amountPlaceHolder.PassedValue, pricePlaceHolder.PassedValue, parameters);
+        }
+        object returnRateLimits = false;
+        var returnRateLimitsparametersVariable = this.handleOptionAndParams(parameters, "editOrderWs", "returnRateLimits", false);
+        returnRateLimits = ((IList<object>)returnRateLimitsparametersVariable)[0];
+        parameters = ((IList<object>)returnRateLimitsparametersVariable)[1];
+        ((IDictionary<string,object>)payload)["returnRateLimits"] = returnRateLimits;
+        object message = new Dictionary<string, object>() {
+            { "id", messageHash },
+            { "method", ((bool) isTrue((isEqual(marketType, "future")))) ? "order.modify" : "order.cancelReplace" },
+            { "params", this.signParams(this.extend(payload, parameters)) },
+        };
+        Dictionary<string, object> subscription = new Dictionary<string, object>() {
+            { "method", this.handleEditOrderWs },
+        };
+        
+        # endregion
+        var queryTemplate = this.SignParamsTemplateQuery(this.extend(payload, parameters));
+        var parametersPlaceHolder = GetParametersPlaceholder(parameters);
+
+        preparedMessage = new PreparedEditOrderMessage(
+            client: this.client(url),
+            exchange: this,
+            url: (string)url,
+            bytesMessage: Encoding.UTF8.GetBytes(JsonSerializer.Generic.Utf16.Serialize(message)),
+            placeholderObjectDict: new Dictionary<string, IPlaceholder>() {
+                { "messageHash", (IPlaceholder)messageHashPlaceHolder },
+                { "id", (IPlaceholder)orderIdPlaceHolder },
+                { "symbol", (IPlaceholder)symbolPlaceHolder },
+                { "type", (IPlaceholder)typePlaceHolder },
+                { "side", (IPlaceholder)sidePlaceHolder },
+                { "amount", (IPlaceholder)amountPlaceHolder },
+                { "price", (IPlaceholder)pricePlaceHolder },
+                { "parameters", (IPlaceholder)parametersPlaceHolder },
+            },
+            subscription: subscription,
+            queryTemplate: queryTemplate
+        );
+
+        return preparedMessage;
+    }
+
+    protected override IEnumerable<WebSocketClient> GetWsClientsForSubscription(string subscriptionType, Dictionary<string, object> parameters = null){
+        return this.clients.Values.ToList();
+    }
+
+    protected override void ProcessJsonMessage(object sender, JsonMessageEventArgs eventArgs){
+        foreach(var subscription in subscriptions){
+            if(subscription == "WatchOrderBookJson" || subscription == "WatchOrderBookForSymbolsJson"){
+                if(eventArgs.Message.StartsWith("{\"e\":\"depthUpdate\"", StringComparison.Ordinal))
+                {
+                    OnWatchOrderBookJsonMessageReceived(sender, eventArgs);
+                }
+            }
+        //    else if(subscription == "FetchMyTradesJson" || subscription == "WatchMyTradesJson"){
+        //         if(eventArgs.Message.StartsWith("{\"channel\":\"userFills\",\"data\":", StringComparison.Ordinal))
+        //         {
+        //             OnWatchMyTradesJsonMessageReceived(sender, eventArgs);
+        //         }
+        //     }
+            else if(subscription == "FetchhOrdersJson" || subscription == "WatchOrdersJson"){
+                if(eventArgs.Message.StartsWith("{\"e\":\"ORDER_TRADE_UPDATE\"", StringComparison.Ordinal))
+                {
+                    //Console.WriteLine(eventArgs.Message);
+                    OnWatchOrdersJsonMessageReceived(sender, eventArgs);
+                }
+            }
+        }
+    }
+
+    public override object GetRequestId(string url = null){
+        return this.requestId(url);
+    }
+
+    Dictionary<string, string> SignatureTemplates = new Dictionary<string, string>(){
+        { "signParamsFastAync", "%REQUEST_ID_PLACE_HOLDER%|%MESSAGE_HASH_PLACE_HOLDER%" }
+    };
+
+    public override string SignParamsTemplateQuery(object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        this.checkRequiredCredentials();
+        object extendedParams = this.extend(new Dictionary<string, object>() {
+            { "timestamp", this.nonce() },
+            { "apiKey", this.apiKey },
+        }, parameters);
+        object defaultRecvWindow = this.safeInteger(this.options, "recvWindow");
+        if (isTrue(!isEqual(defaultRecvWindow, null)))
+        {
+            ((IDictionary<string,object>)parameters)["recvWindow"] = defaultRecvWindow;
+        }
+        object recvWindow = this.safeInteger(parameters, "recvWindow");
+        if (isTrue(!isEqual(recvWindow, null)))
+        {
+            ((IDictionary<string,object>)parameters)["recvWindow"] = recvWindow;
+        }
+        extendedParams = this.keysort(extendedParams);
+        string query = this.urlencode(extendedParams);
+        // object signature = null;
+        // if (isTrue(isGreaterThan(getIndexOf(this.secret, "PRIVATE KEY"), -1)))
+        // {
+        //     if (isTrue(isGreaterThan(((string)this.secret).Length, 120)))
+        //     {
+        //         signature = rsa(query, this.secret, sha256);
+        //     } else
+        //     {
+        //         signature = eddsa(this.encode(query), this.secret, ed25519);
+        //     }
+        // } else
+        // {
+        //     signature = this.hmac(this.encode(query), this.encode(this.secret), sha256);
+        // }
+        //((IDictionary<string,object>)extendedParams)["signature"] = signature;
+        return query;
+    }
+
+
+    // private HashAlgorithmName sha256Hkdf = new HashAlgorithmName("SHA256");
+    public override async Task<byte[]> GetSignatureFromTemplateQuery(string query)
+    {
+        string signature = null;
+        if (isTrue(isGreaterThan(getIndexOf(this.secret, "PRIVATE KEY"), -1)))
+        {
+            if (isTrue(isGreaterThan(((string)this.secret).Length, 120)))
+            {
+                signature = (string)rsa(query, this.secret, sha256);
+            } else
+            {
+                signature = (string)eddsa(this.encode(query), this.secret, ed25519);
+            }
+        } else
+        {
+            // signature = Hkdf.Extract(sha256Hkdf, new System.ReadOnlySpan<byte>(Encoding.UTF8.GetBytes(this.encode(query))), new System.ReadOnlySpan<byte>(Encoding.UTF8.GetBytes(this.encode(this.secret))), new byte[32 - 1]);
+            // Slower implementation
+            signature = (string)this.hmac(this.encode(query), this.encode(this.secret), sha256);
+        }
+        return Encoding.UTF8.GetBytes(signature);
+    }
+
+    public virtual void SubscribeOrders(object symbol = null, object since = null, object limit = null, object parameters = null)
+    {
+         
+        /**
+        * @method
+        * @name binance#watchOrders
+        * @description watches information on multiple orders made by the user
+        * @see https://developers.binance.com/docs/binance-spot-api-docs/user-data-stream#order-update
+        * @see https://developers.binance.com/docs/margin_trading/trade-data-stream/Event-Order-Update
+        * @see https://developers.binance.com/docs/derivatives/usds-margined-futures/user-data-streams/Event-Order-Update
+        * @param {string} symbol unified market symbol of the market the orders were made in
+        * @param {int} [since] the earliest time in ms to fetch orders for
+        * @param {int} [limit] the maximum number of order structures to retrieve
+        * @param {object} [params] extra parameters specific to the exchange API endpoint
+        * @param {string|undefined} [params.marginMode] 'cross' or 'isolated', for spot margin
+        * @param {boolean} [params.portfolioMargin] set to true if you would like to watch portfolio margin account orders
+        * @returns {object[]} a list of [order structures]{@link https://docs.ccxt.com/#/?id=order-structure}
+        */
+        parameters ??= new Dictionary<string, object>();
+        this.loadMarkets();
+        object messageHash = "orders";
+        object market = null;
+        if (isTrue(!isEqual(symbol, null)))
+        {
+            market = this.market(symbol);
+            symbol = getValue(market, "symbol");
+            messageHash = add(messageHash, add(":", symbol));
+        }
+        object type = null;
+        var typeparametersVariable = this.handleMarketTypeAndParams("watchOrders", market, parameters);
+        type = ((IList<object>)typeparametersVariable)[0];
+        parameters = ((IList<object>)typeparametersVariable)[1];
+        object subType = null;
+        var subTypeparametersVariable = this.handleSubTypeAndParams("watchOrders", market, parameters);
+        subType = ((IList<object>)subTypeparametersVariable)[0];
+        parameters = ((IList<object>)subTypeparametersVariable)[1];
+        if (isTrue(this.isLinear(type, subType)))
+        {
+            type = "future";
+        } else if (isTrue(this.isInverse(type, subType)))
+        {
+            type = "delivery";
+        }
+        parameters = this.extend(parameters, new Dictionary<string, object>() {
+            { "type", type },
+            { "symbol", symbol },
+        }); // needed inside authenticate for isolated margin
+        this.authenticate(parameters);
+        object marginMode = null;
+        var marginModeparametersVariable = this.handleMarginModeAndParams("watchOrders", parameters);
+        marginMode = ((IList<object>)marginModeparametersVariable)[0];
+        parameters = ((IList<object>)marginModeparametersVariable)[1];
+        object urlType = type;
+        if (isTrue(isTrue((isEqual(type, "margin"))) || isTrue((isTrue((isEqual(type, "spot"))) && isTrue((!isEqual(marginMode, null)))))))
+        {
+            urlType = "spot"; // spot-margin shares the same stream as regular spot
+        }
+        object isPortfolioMargin = null;
+        var isPortfolioMarginparametersVariable = this.handleOptionAndParams2(parameters, "watchOrders", "papi", "portfolioMargin", false);
+        isPortfolioMargin = ((IList<object>)isPortfolioMarginparametersVariable)[0];
+        parameters = ((IList<object>)isPortfolioMarginparametersVariable)[1];
+        if (isTrue(isPortfolioMargin))
+        {
+            urlType = "papi";
+        }
+        object url = add(add(getValue(getValue(getValue(this.urls, "api"), "ws"), urlType), "/"), getValue(getValue(this.options, type), "listenKey"));
+        var client = this.client(url);
+        string message = "";
+        client.send(message).Wait();
+
+    }
+    
 }

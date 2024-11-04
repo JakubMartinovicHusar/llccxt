@@ -42,5 +42,8 @@
     <Pack>true</Pack>
   </None>
 </ItemGroup>
+<ItemGroup>
+  <ProjectReference Include="..\..\..\HKDF.Standard\src\HkdfStandard\HkdfStandard.csproj" />
+</ItemGroup>
 
 </Project>

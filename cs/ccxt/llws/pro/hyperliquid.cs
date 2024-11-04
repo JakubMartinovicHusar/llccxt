@@ -10,100 +10,292 @@ namespace ccxt.pro;
 
 public partial class hyperliquid : ccxt.hyperliquid
 {
-    public override PreparedMessage CreateOrderPrepareMessageWs(object parameters = null)
-    {
-        parameters = (object)new Dictionary<string, object>((Dictionary<string, object>)parameters);
-        PreparedMessage preparedMessage;
 
-        object requestIdPlaceHolder = "%REQUEST_ID_PLACE_HOLDER%";
-        object messageHashPlaceHolder = "%MESSAGE_HASH_PLACE_HOLDER%";
-        object symbolPlaceHolder = "%SYMBOL_PLACE_HOLDER%";
-        object typePlaceHolder = "%TYPE_PLACE_HOLDER%"; 
-        object sidePlaceHolder = "%SIDE_PLACE_HOLDER%"; 
-        object amountPlaceHolder = "%AMOUNT_PLACE_HOLDER%"; 
-        object pricePlaceHolder = "%PRICE_PLACE_HOLDER%"; 
-        
+    private Placeholder<string> orderIdPlaceHolder = new Placeholder<string>("999999", "999999");
+    private Placeholder<string> symbolPlaceHolder =  new Placeholder<string>("BTC/USDC:USDC", "BTCUSDC");
+    private Placeholder<string> typePlaceHolder = new Placeholder<string>("limit", "LIMIT"); 
+    private Placeholder<string> sidePlaceHolder = new Placeholder<string>("buy", "BUY"); 
+    private Placeholder<double> amountPlaceHolder = new Placeholder<double>(0.1, "0.1"); 
+    private Placeholder<double> pricePlaceHolder = new Placeholder<double>(0.9, "0.9");
+
+    public override PreparedCreateOrderMessage CreateOrderPrepareMessageWs(Dictionary<string, object> prepareParameters = null)
+    {    
+        object parameters = null;
+        if (parameters == null)
+            parameters = (object)new Dictionary<string, object>();
+        else
+            parameters = (object)prepareParameters.ToDictionary(entry => entry.Key, entry => entry.Value); // clone
+
+        PreparedCreateOrderMessage preparedMessage;
 
         #region CREATE ORDER ****************************** this part of code is from createOrder method ****************************** //
 
         parameters ??= new Dictionary<string, object>();
         
-        ((Dictionary<string, object>)parameters)["symbol"] = symbolPlaceHolder;
-        ((Dictionary<string, object>)parameters)["type"] = typePlaceHolder;
-        ((Dictionary<string, object>)parameters)["side"] = sidePlaceHolder;
-        ((Dictionary<string, object>)parameters)["amount"] = amountPlaceHolder;
-        ((Dictionary<string, object>)parameters)["price"] = pricePlaceHolder;
+        ((Dictionary<string, object>)parameters)["symbol"] = symbolPlaceHolder.PassedValue;
+        ((Dictionary<string, object>)parameters)["type"] = typePlaceHolder.PassedValue;
+        ((Dictionary<string, object>)parameters)["side"] = sidePlaceHolder.PassedValue;
+        ((Dictionary<string, object>)parameters)["amount"] = amountPlaceHolder.PassedValue;
+        ((Dictionary<string, object>)parameters)["price"] = pricePlaceHolder.PassedValue;
 
+        this.loadMarkets().Wait();
+        parameters ??= new Dictionary<string, object>();
         this.loadMarkets().Wait();
         object url = getValue(getValue(getValue(this.urls, "api"), "ws"), "public");
         object ordersRequest = this.createOrdersRequest(orders, parameters);
         object wrapped = this.wrapAsPostAction(ordersRequest);
         object request = this.safeDict(wrapped, "request", new Dictionary<string, object>() {});
-        object requestId = requestIdPlaceHolder;
-        // object response = await this.watch(url, requestId, request, requestId);
-        // object responseOjb = this.safeDict(response, "response", new Dictionary<string, object>() {});
-        // object data = this.safeDict(responseOjb, "data", new Dictionary<string, object>() {});
-        // object statuses = this.safeList(data, "statuses", new List<object>() {});
-        // this.parseOrders(statuses, null);
+        object requestId = this.safeString(wrapped, "requestId");
 
-        // parameters ??= new Dictionary<string, object>();
-        // this.loadMarkets().Wait();
-        // object market = this.market(symbolPlaceHolder);
-        // object marketType = this.getMarketType("createOrderWs", market, parameters);
-        // if (isTrue(isTrue(!isEqual(marketType, "spot")) && isTrue(!isEqual(marketType, "future"))))
-        // {
-        //     throw new BadRequest ((string)add(this.id, " createOrderWs only supports spot or swap markets")) ;
-        // }
-        // object url = getValue(getValue(getValue(getValue(this.urls, "api"), "ws"), "ws-api"), marketType);
-        object sor = this.safeBool2(parameters, "sor", "SOR", false);
-        parameters = this.omit(parameters, "sor", "SOR");
-        // object payload = this.createOrderRequest(symbolPlaceHolder, typePlaceHolder, sidePlaceHolder, amountPlaceHolder, pricePlaceHolder, parameters);
-        object returnRateLimits = false;
-        var returnRateLimitsparametersVariable = this.handleOptionAndParams(parameters, "createOrderWs", "returnRateLimits", false);
-        returnRateLimits = ((IList<object>)returnRateLimitsparametersVariable)[0];
-        parameters = ((IList<object>)returnRateLimitsparametersVariable)[1];
-        
-        ((IDictionary<string,object>)ordersRequest)["returnRateLimits"] = returnRateLimits;
-        object test = this.safeBool(parameters, "test", false);
-        parameters = this.omit(parameters, "test");
-        object message = new Dictionary<string, object>() {
-            { "id", messageHashPlaceHolder },
-            { "method", "order.place" },
-            // { "params", this.signParams(this.extend(ordersRequest, parameters)) },
-        };
-        if (isTrue(test))
-        {
-            if (isTrue(sor))
-            {
-                ((IDictionary<string,object>)message)["method"] = "sor.order.test";
-            } else
-            {
-                ((IDictionary<string,object>)message)["method"] = "order.test";
-            }
-        }
         var subscription = new Dictionary<string, object>() {
           //   { "method", this.handleOrderWs },
         };
         #endregion
 
-        preparedMessage = new PreparedMessage(
+        var parametersPlaceHolder = GetParametersPlaceholder(parameters);
+
+        preparedMessage = new PreparedCreateOrderMessage(
             client: this.client(url),
             exchange: this,
             url: (string)url,
-            bytesMessage: Encoding.UTF8.GetBytes( JsonSerializer.Generic.Utf16.Serialize(message)), 
-            placeholderObjectDict: new Dictionary<string, object>() {
-                { "messageHash", messageHashPlaceHolder },
-                { "symbol", symbolPlaceHolder },
-                { "type", typePlaceHolder },
-                { "side", sidePlaceHolder },
-                { "amount", amountPlaceHolder },
-                { "price", pricePlaceHolder },
-                { "parameters", parameters },
+            bytesMessage: Encoding.UTF8.GetBytes(JsonSerializer.Generic.Utf16.Serialize(request)), 
+            placeholderObjectDict: new Dictionary<string, IPlaceholder>() {
+                { "symbol", (IPlaceholder)symbolPlaceHolder },
+                { "type", (IPlaceholder)typePlaceHolder },
+                { "side", (IPlaceholder)sidePlaceHolder },
+                { "amount", (IPlaceholder)amountPlaceHolder },
+                { "price", (IPlaceholder)pricePlaceHolder },
+                { "parameters", (IPlaceholder)parametersPlaceHolder },
             },
             subscription : subscription
         );
 
         return preparedMessage;
-        // await this.watch(url, messageHash, message, messageHash, subscription);
     }
+
+    public override PreparedCancelOrderMessage CancelOrderPrepareMessageWs(Dictionary<string, object> prepareParameters = null)
+    {    
+        object parameters = null;
+        if (parameters == null)
+            parameters = (object)new Dictionary<string, object>();
+        else
+            parameters = (object)prepareParameters.ToDictionary(entry => entry.Key, entry => entry.Value); // clone
+
+        PreparedCancelOrderMessage preparedMessage;
+
+        #region CANCEL ORDER ****************************** this part of code is from createOrder method ****************************** //
+
+        parameters ??= new Dictionary<string, object>();
+        this.checkRequiredCredentials();
+        this.loadMarkets().Wait();
+        object nonce = this.GetNewMillisecondNonce();// this.milliseconds();
+        object request = new Dictionary<string, object>() {
+            { "nonce", nonce },
+        };
+        object cancelReq = new List<object>() {};
+        object cancelAction = new Dictionary<string, object>() {
+            { "type", "" },
+            { "cancels", new List<object>() {} },
+        };
+        object cancelByCloid = false;
+        for (object i = 0; isLessThan(i, getArrayLength(orders)); postFixIncrement(ref i))
+        {
+            object order = getValue(orders, i);
+            object clientOrderId = this.safeString(order, "clientOrderId");
+            if (isTrue(!isEqual(clientOrderId, null)))
+            {
+                cancelByCloid = true;
+            }
+            object id = this.safeString(order, "id");
+            object symbol = this.safeString(order, "symbol");
+            if (isTrue(isEqual(symbol, null)))
+            {
+                throw new ArgumentsRequired ((string)add(this.id, " cancelOrdersForSymbols() requires a symbol argument in each order")) ;
+            }
+            if (isTrue(isTrue(!isEqual(id, null)) && isTrue(cancelByCloid)))
+            {
+                throw new BadRequest ((string)add(this.id, " cancelOrdersForSymbols() all orders must have either id or clientOrderId")) ;
+            }
+            object assetKey = ((bool) isTrue(cancelByCloid)) ? "asset" : "a";
+            object idKey = ((bool) isTrue(cancelByCloid)) ? "cloid" : "o";
+            object market = this.market(symbol);
+            object cancelObj = new Dictionary<string, object>() {};
+            ((IDictionary<string,object>)cancelObj)[(string)assetKey] = this.parseToNumeric(getValue(market, "baseId"));
+            ((IDictionary<string,object>)cancelObj)[(string)idKey] = ((bool) isTrue(cancelByCloid)) ? clientOrderId : this.parseToNumeric(id);
+            ((IList<object>)cancelReq).Add(cancelObj);
+        }
+        ((IDictionary<string,object>)cancelAction)["type"] = ((bool) isTrue(cancelByCloid)) ? "cancelByCloid" : "cancel";
+        ((IDictionary<string,object>)cancelAction)["cancels"] = cancelReq;
+        object vaultAddress = this.formatVaultAddress(this.safeString(parameters, "vaultAddress"));
+        object signature = this.signL1Action(cancelAction, nonce, vaultAddress);
+        ((IDictionary<string,object>)request)["action"] = cancelAction;
+        ((IDictionary<string,object>)request)["signature"] = signature;
+        if (isTrue(!isEqual(vaultAddress, null)))
+        {
+            parameters = this.omit(parameters, "vaultAddress");
+            ((IDictionary<string,object>)request)["vaultAddress"] = vaultAddress;
+        }
+        // object response = await this.privatePostExchange(request);
+        Dictionary<string, object> subscription = new Dictionary<string, object>() {
+          //   { "method", this.handleOrderWs },
+        };
+        
+        # endregion
+
+       var parametersPlaceHolder = GetParametersPlaceholder(parameters);
+
+        preparedMessage = new PreparedCancelOrderMessage(
+            client: this.client(url),
+            exchange: this,
+            url: (string)url,
+            bytesMessage: Encoding.UTF8.GetBytes( JsonSerializer.Generic.Utf16.Serialize(request)), 
+            placeholderObjectDict: new Dictionary<string, IPlaceholder>() {
+                { "id", (IPlaceholder)orderIdPlaceHolder },
+                { "symbol", (IPlaceholder)symbolPlaceHolder },
+                { "parameters", (IPlaceholder)parametersPlaceHolder },
+            },
+            subscription : subscription
+        );
+
+        return preparedMessage;
+
+    }
+
+    public override PreparedEditOrderMessage EditOrderPrepareMessageWs(Dictionary<string, object> prepareParameters = null)
+    {  
+        object parameters = null;
+        if (parameters == null)
+            parameters = (object)new Dictionary<string, object>();
+        else
+            parameters = (object)prepareParameters.ToDictionary(entry => entry.Key, entry => entry.Value); // clone
+        
+        PreparedEditOrderMessage preparedMessage = null;
+
+        #region EDIT ORDER ****************************** this part of code is from createOrder method ****************************** //
+
+        parameters ??= new Dictionary<string, object>();
+        this.loadMarkets().Wait();
+        object market = this.market(symbol);
+        object url = getValue(getValue(getValue(this.urls, "api"), "ws"), "public");
+        object postRequest = this.editOrderRequest(orderIdPlaceHolder.PassedValue, symbolPlaceHolder.PassedValue, typePlaceHolder.PassedValue, sidePlaceHolder.PassedValue, amountPlaceHolder.PassedValue, pricePlaceHolder.PassedValue, parameters);
+        object wrapped = this.wrapAsPostAction(postRequest);
+        object request = this.safeDict(wrapped, "request", new Dictionary<string, object>() {});
+        object requestId = this.safeString(wrapped, "requestId");
+        
+        # endregion
+        Dictionary<string, object> subscription = new Dictionary<string, object>() {
+          //   { "method", this.handleOrderWs },
+        };
+        
+        var parametersPlaceHolder = GetParametersPlaceholder(parameters);
+        
+        preparedMessage = new PreparedEditOrderMessage(
+            client: this.client(url),
+            exchange: this,
+            url: (string)url,
+            bytesMessage: Encoding.UTF8.GetBytes(JsonSerializer.Generic.Utf16.Serialize(request)), 
+            placeholderObjectDict: new Dictionary<string, IPlaceholder>() {
+                { "id", (IPlaceholder)orderIdPlaceHolder },
+                { "symbol", (IPlaceholder)symbolPlaceHolder },
+                { "type", (IPlaceholder)typePlaceHolder },
+                { "side", (IPlaceholder)sidePlaceHolder },
+                { "amount", (IPlaceholder)amountPlaceHolder },
+                { "price", (IPlaceholder)pricePlaceHolder },
+                { "parameters", (IPlaceholder)parametersPlaceHolder },
+            },
+            subscription : subscription
+        );
+
+        return preparedMessage;
+    }
+
+    public override object PostProcessResponse(object response, string symbol)
+    {
+        object responseObject = this.safeDict(response, "response", new Dictionary<string, object>() {});
+        object dataObject = this.safeDict(responseObject, "data", new Dictionary<string, object>() {});
+        object statuses = this.safeList(dataObject, "statuses", new List<object>() {});
+        object first = this.safeDict(statuses, 0, new Dictionary<string, object>() {});
+        return this.parseOrder(first, market);
+    }
+
+    protected override IEnumerable<WebSocketClient> GetWsClientsForSubscription(string subscriptionType, Dictionary<string, object> parameters = null){
+        
+        return this.clients.Values.ToList();
+    }
+
+    protected override void ProcessJsonMessage(object sender, JsonMessageEventArgs eventArgs){
+        foreach(var subscription in subscriptions){
+            if(subscription == "WatchOrderBookJson" || subscription == "WatchOrderBookForSymbolsJson"){
+                if(eventArgs.Message.StartsWith("{\"channel\":\"l2Book\",\"data\":{", StringComparison.Ordinal))
+                {
+                    OnWatchOrderBookJsonMessageReceived(sender, eventArgs);
+                }
+            }
+            else if(subscription == "FetchMyTradesJson" || subscription == "WatchMyTradesJson"){
+                if(eventArgs.Message.StartsWith("{\"channel\":\"userFills\",\"data\":", StringComparison.Ordinal))
+                {
+                    OnWatchMyTradesJsonMessageReceived(sender, eventArgs);
+                }
+            }
+            else if(subscription == "FetchhOrdersJson" || subscription == "WatchOrdersJson"){
+                if(eventArgs.Message.StartsWith("{\"channel\":\"orderUpdates\",\"data\":", StringComparison.Ordinal))
+                {
+                    //Console.WriteLine(eventArgs.Message);
+                    OnWatchOrdersJsonMessageReceived(sender, eventArgs);
+                }
+            }
+        }
+    }
+
+    public override object GetRequestId(string url = null){
+        return this.requestId();
+    }
+
+
+    public virtual void SubscribeOrders(object symbol = null, object since = null, object limit = null, object parameters = null)
+    {
+        /**
+        * @method
+        * @name hyperliquid#watchOrders
+        * @description watches information on multiple orders made by the user
+        * @see https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/websocket/subscriptions
+        * @param {string} symbol unified market symbol of the market orders were made in
+        * @param {int} [since] the earliest time in ms to fetch orders for
+        * @param {int} [limit] the maximum number of order structures to retrieve
+        * @param {object} [params] extra parameters specific to the exchange API endpoint
+        * @param {string} [params.user] user address, will default to this.walletAddress if not provided
+        * @returns {object[]} a list of [order structures]{@link https://docs.ccxt.com/#/?id=order-structure}
+        */
+        parameters ??= new Dictionary<string, object>();
+        this.loadMarkets();
+        object userAddress = null;
+        var userAddressparametersVariable = this.handlePublicAddress("watchOrders", parameters);
+        userAddress = ((IList<object>)userAddressparametersVariable)[0];
+        parameters = ((IList<object>)userAddressparametersVariable)[1];
+        object market = null;
+        object messageHash = "order";
+        if (isTrue(!isEqual(symbol, null)))
+        {
+            market = this.market(symbol);
+            symbol = getValue(market, "symbol");
+            messageHash = add(add(messageHash, ":"), symbol);
+        }
+        object url = getValue(getValue(getValue(this.urls, "api"), "ws"), "public");
+        object request = new Dictionary<string, object>() {
+            { "method", "subscribe" },
+            { "subscription", new Dictionary<string, object>() {
+                { "type", "orderUpdates" },
+                { "user", userAddress },
+            } },
+        };
+       
+        var client = this.client(url);
+
+        var connected = client.connect(0);
+        connected.Wait();
+        object message = this.extend(request, parameters);
+        client.send(message).Wait();
+
+    }
+    
 }

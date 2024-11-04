@@ -23,6 +23,7 @@ public partial class Exchange
         {
             lock (obj)
             {
+                // Console.WriteLine($"Locked by {Thread.CurrentThread.ManagedThreadId} ({Thread.CurrentThread.Name})");
                 if (!this.tcs.Task.IsCompleted)
                 {
                     if (this.tcs.Task.Status == TaskStatus.RanToCompletion)
@@ -33,6 +34,7 @@ public partial class Exchange
                 }
                 // this.tcs = new TaskCompletionSource<object>(); // reset
                 // this.task = this.tcs.Task;
+                // Console.WriteLine($"Released by {Thread.CurrentThread.ManagedThreadId} ({Thread.CurrentThread.Name})");
             }
         }
 
